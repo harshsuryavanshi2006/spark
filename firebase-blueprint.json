@@ -1,5 +1,118 @@
 {
   "entities": {
+    "AdminUser": {
+      "title": "AdminUser",
+      "description": "Allowlisted portal administrator or event coordinator.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "email": {
+          "type": "string",
+          "minLength": 3,
+          "maxLength": 255
+        },
+        "name": {
+          "type": "string",
+          "maxLength": 100
+        },
+        "role": {
+          "type": "string",
+          "enum": ["super_admin", "admin"]
+        },
+        "added_by": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 255
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["id", "email", "name", "role", "added_by", "created_at"]
+    },
+    "Event": {
+      "title": "Event",
+      "description": "Shared campus event managed by admins and displayed across Student and Admin portals.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 120
+        },
+        "tag": {
+          "type": "string",
+          "enum": ["Cultural", "Technical", "Creative", "Design", "Sports", "Social", "Workshop", "Other"]
+        },
+        "status": {
+          "type": "string",
+          "enum": ["upcoming", "ongoing", "past"]
+        },
+        "date": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 40
+        },
+        "time": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 40
+        },
+        "place": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 120
+        },
+        "tags": {
+          "type": "string",
+          "maxLength": 120
+        },
+        "image": {
+          "type": "string",
+          "maxLength": 100000
+        },
+        "description": {
+          "type": "string",
+          "maxLength": 1000
+        },
+        "registration_open": {
+          "type": "boolean"
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updated_at": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "title",
+        "tag",
+        "status",
+        "date",
+        "time",
+        "place",
+        "tags",
+        "image",
+        "description",
+        "registration_open",
+        "created_at",
+        "updated_at"
+      ]
+    },
     "StudentDetails": {
       "title": "StudentDetails",
       "description": "Validated student details attached to an event registration.",
@@ -47,7 +160,7 @@
     },
     "Profile": {
       "title": "Profile",
-      "description": "Private student profile record owned by a single authenticated user.",
+      "description": "Private student profile record owned by a single authenticated user and readable by admins.",
       "type": "object",
       "properties": {
         "id": {
@@ -126,18 +239,16 @@
         },
         "event_id": {
           "type": "string",
-          "enum": [
-            "freshers-garba-session",
-            "open-mic-night",
-            "creative-challenge",
-            "football-tournament",
-            "tech-talk-series",
-            "dance-workshop"
-          ]
+          "minLength": 1,
+          "maxLength": 64
         },
         "student_details": {
           "type": "object",
           "$ref": "#/entities/StudentDetails"
+        },
+        "attendance_status": {
+          "type": "string",
+          "enum": ["registered", "attended", "absent"]
         },
         "created_at": {
           "type": "string",
@@ -194,7 +305,7 @@
     },
     "ClubSuggestion": {
       "title": "ClubSuggestion",
-      "description": "Student-submitted suggestion for a new campus club.",
+      "description": "Student-submitted suggestion for a new campus club, reviewable by admins.",
       "type": "object",
       "properties": {
         "id": {
@@ -221,6 +332,14 @@
           "minLength": 1,
           "maxLength": 1000
         },
+        "status": {
+          "type": "string",
+          "enum": ["pending", "approved", "declined"]
+        },
+        "admin_note": {
+          "type": "string",
+          "maxLength": 500
+        },
         "created_at": {
           "type": "string",
           "format": "date-time"
@@ -230,13 +349,21 @@
     }
   },
   "firestore": {
+    "/admins/{adminId}": {
+      "schema": { "$ref": "#/entities/AdminUser" },
+      "description": "Allowlisted admin coordinator records managed by verified admins."
+    },
+    "/events/{eventId}": {
+      "schema": { "$ref": "#/entities/Event" },
+      "description": "Public campus events catalog managed by admins and displayed to students."
+    },
     "/profiles/{userId}": {
       "schema": { "$ref": "#/entities/Profile" },
-      "description": "Owner-only student profile documents keyed by Firebase Auth UID."
+      "description": "Owner-only student profile documents keyed by Firebase Auth UID (readable by admins)."
     },
     "/event_registrations/{registrationId}": {
       "schema": { "$ref": "#/entities/EventRegistration" },
-      "description": "Owner-scoped event registration documents keyed by {userId}_{eventId}."
+      "description": "Owner-scoped event registration documents keyed by {userId}_{eventId} (readable/manageable by admins)."
     },
     "/clubs/{clubId}": {
       "schema": { "$ref": "#/entities/Club" },
@@ -244,11 +371,11 @@
     },
     "/club_memberships/{membershipId}": {
       "schema": { "$ref": "#/entities/ClubMembership" },
-      "description": "Owner-scoped unique club memberships keyed by {userId}_{clubId}."
+      "description": "Owner-scoped unique club memberships keyed by {userId}_{clubId} (readable by admins)."
     },
     "/club_suggestions/{suggestionId}": {
       "schema": { "$ref": "#/entities/ClubSuggestion" },
-      "description": "Owner-scoped new club suggestions submitted by signed-in students."
+      "description": "Owner-scoped new club suggestions submitted by signed-in students and reviewed by admins."
     }
   }
 }

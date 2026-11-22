@@ -26,6 +26,29 @@ service cloud.firestore {
       return isSignedIn() && request.auth.token.email_verified == true;
     }
 
+    function emailKey(email) {
+      return email.lower().replace('[^a-z0-9_\\-]', '_');
+    }
+
+    function isAdmin() {
+      return isVerified() && (
+        (request.auth.token.email is string && request.auth.token.email.lower() == 'hrssuryavanshi135@gmail.com') ||
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid)) ||
+        (request.auth.token.email is string && exists(/databases/$(database)/documents/admins/$(emailKey(request.auth.token.email))))
+      );
+    }
+
+    function isValidAdmin(data) {
+      return data.keys().hasAll(['id', 'email', 'name', 'role', 'added_by', 'created_at'])
+        && data.keys().hasOnly(['id', 'email', 'name', 'role', 'added_by', 'created_at'])
+        && isValidId(data.id)
+        && data.email is string && data.email.size() >= 3 && data.email.size() <= 255
+        && data.name is string && data.name.size() <= 100
+        && data.role is string && data.role in ['super_admin', 'admin']
+        && data.added_by is string && data.added_by.size() >= 1 && data.added_by.size() <= 255
+        && data.created_at is timestamp;
+    }
+
     function isValidDivision(val, allowEmpty) {
       return val is string && val.size() <= 10 && (
         val in ['Comp', 'IT', 'Entc', 'Other'] || (allowEmpty && val == '')
@@ -56,12 +79,37 @@ service cloud.firestore {
       );
     }
 
-    function isValidAvatarUrl(val) {
+    function isValidMediaRef(val) {
       return val is string && val.size() <= 100000 && (
         val == '' ||
+        val.matches('^[a-z0-9_\\-]{1,40}$') ||
         val.matches('^https://.*') ||
         val.matches('^data:image/(jpeg|jpg|png|webp);base64,[A-Za-z0-9+/=]+$')
       );
+    }
+
+    function isValidEvent(data) {
+      return data.keys().hasAll([
+          'id', 'title', 'tag', 'status', 'date', 'time', 'place',
+          'tags', 'image', 'description', 'registration_open', 'created_at', 'updated_at'
+        ])
+        && data.keys().hasOnly([
+          'id', 'title', 'tag', 'status', 'date', 'time', 'place',
+          'tags', 'image', 'description', 'registration_open', 'created_at', 'updated_at'
+        ])
+        && isValidId(data.id) && data.id.size() <= 64
+        && data.title is string && data.title.size() >= 1 && data.title.size() <= 120
+        && data.tag is string && data.tag in ['Cultural', 'Technical', 'Creative', 'Design', 'Sports', 'Social', 'Workshop', 'Other']
+        && data.status is string && data.status in ['upcoming', 'ongoing', 'past']
+        && data.date is string && data.date.size() >= 1 && data.date.size() <= 40
+        && data.time is string && data.time.size() >= 1 && data.time.size() <= 40
+        && data.place is string && data.place.size() >= 1 && data.place.size() <= 120
+        && data.tags is string && data.tags.size() <= 120
+        && isValidMediaRef(data.image)
+        && data.description is string && data.description.size() <= 1000
+        && data.registration_open is bool
+        && data.created_at is timestamp
+        && data.updated_at is timestamp;
     }
 
     function isValidProfile(data) {
@@ -84,12 +132,12 @@ service cloud.firestore {
         && isValidDob(data.date_of_birth, true)
         && data.college is string && data.college.size() <= 150
         && isValidPhone(data.phone, true)
-        && isValidAvatarUrl(data.avatar_url)
+        && isValidMediaRef(data.avatar_url)
         && data.created_at is timestamp
         && data.updated_at is timestamp;
     }
 
-    function isValidEventId(id) {
+    function isLegacyEventId(id) {
       return id is string && id.size() <= 64 && id in [
         'freshers-garba-session',
         'open-mic-night',
@@ -98,6 +146,13 @@ service cloud.firestore {
         'tech-talk-series',
         'dance-workshop'
       ];
+    }
+
+    function isValidEventRef(eventId) {
+      return isValidId(eventId) && eventId.size() <= 64 && (
+        isLegacyEventId(eventId) ||
+        exists(/databases/$(database)/documents/events/$(eventId))
+      );
     }
 
     function isValidStudentDetails(details) {
@@ -120,12 +175,12 @@ service cloud.firestore {
 
     function isValidEventRegistration(data) {
       return data.keys().hasAll(['id', 'user_id', 'event_id', 'student_details', 'created_at'])
-        && data.keys().hasOnly(['id', 'user_id', 'event_id', 'student_details', 'created_at'])
+        && data.keys().hasOnly(['id', 'user_id', 'event_id', 'student_details', 'attendance_status', 'created_at'])
         && isValidId(data.id)
         && isValidId(data.user_id)
-        && data.user_id == request.auth.uid
-        && isValidEventId(data.event_id)
+        && isValidEventRef(data.event_id)
         && isValidStudentDetails(data.student_details)
+        && (!('attendance_status' in data) || (data.attendance_status is string && data.attendance_status in ['registered', 'attended', 'absent']))
         && data.created_at is timestamp;
     }
 
@@ -172,20 +227,66 @@ service cloud.firestore {
 
     function isValidClubSuggestion(data) {
       return data.keys().hasAll(['id', 'user_id', 'club_name', 'category', 'reason', 'created_at'])
-        && data.keys().hasOnly(['id', 'user_id', 'club_name', 'category', 'reason', 'created_at'])
+        && data.keys().hasOnly(['id', 'user_id', 'club_name', 'category', 'reason', 'status', 'admin_note', 'created_at'])
         && isValidId(data.id)
         && isValidId(data.user_id)
-        && data.user_id == request.auth.uid
         && data.club_name is string && data.club_name.size() >= 1 && data.club_name.size() <= 100
         && data.category is string && data.category.size() <= 20
         && data.category in ['Technical', 'Cultural', 'Sports', 'Workshop', 'Social', 'Other']
         && data.reason is string && data.reason.size() >= 1 && data.reason.size() <= 1000
+        && (!('status' in data) || (data.status is string && data.status in ['pending', 'approved', 'declined']))
+        && (!('admin_note' in data) || (data.admin_note is string && data.admin_note.size() <= 500))
         && data.created_at is timestamp;
     }
 
+    match /admins/{adminId} {
+      allow get: if isVerified() && isValidId(adminId) && (
+        isAdmin() ||
+        adminId == request.auth.uid ||
+        (request.auth.token.email is string && adminId == emailKey(request.auth.token.email))
+      );
+      allow list: if isAdmin();
+      allow create: if isAdmin()
+        && isValidId(adminId)
+        && isValidAdmin(incoming())
+        && incoming().id == adminId
+        && incoming().created_at == request.time;
+      allow update: if isAdmin()
+        && isValidId(adminId)
+        && isValidAdmin(incoming())
+        && incoming().id == existing().id
+        && incoming().created_at == existing().created_at
+        && incoming().diff(existing()).affectedKeys().hasOnly(['name', 'role', 'email', 'added_by']);
+      allow delete: if isAdmin() && isValidId(adminId);
+    }
+
+    match /events/{eventId} {
+      allow get: if isValidId(eventId) && eventId.size() <= 64;
+      allow list: if true;
+      allow create: if isAdmin()
+        && isValidId(eventId)
+        && eventId.size() <= 64
+        && isValidEvent(incoming())
+        && incoming().id == eventId
+        && incoming().created_at == request.time
+        && incoming().updated_at == request.time;
+      allow update: if isAdmin()
+        && isValidId(eventId)
+        && eventId.size() <= 64
+        && isValidEvent(incoming())
+        && incoming().id == existing().id
+        && incoming().created_at == existing().created_at
+        && incoming().updated_at == request.time
+        && incoming().diff(existing()).affectedKeys().hasOnly([
+          'title', 'tag', 'status', 'date', 'time', 'place',
+          'tags', 'image', 'description', 'registration_open', 'updated_at'
+        ]);
+      allow delete: if isAdmin() && isValidId(eventId) && eventId.size() <= 64;
+    }
+
     match /profiles/{userId} {
-      allow get: if isSignedIn() && isValidId(userId) && request.auth.uid == userId;
-      allow list: if false;
+      allow get: if isSignedIn() && isValidId(userId) && (request.auth.uid == userId || isAdmin());
+      allow list: if isAdmin();
       allow create: if isVerified()
         && isValidId(userId)
         && request.auth.uid == userId
@@ -208,18 +309,29 @@ service cloud.firestore {
 
     match /event_registrations/{registrationId} {
       allow get: if isSignedIn() && isValidId(registrationId) && (
+        isAdmin() ||
         (resource == null && registrationId.matches('^' + request.auth.uid + '_.*')) ||
         (resource != null && existing().user_id == request.auth.uid)
       );
-      allow list: if isSignedIn() && existing().user_id == request.auth.uid;
+      allow list: if isSignedIn() && (existing().user_id == request.auth.uid || isAdmin());
       allow create: if isVerified()
         && isValidId(registrationId)
         && isValidEventRegistration(incoming())
+        && incoming().user_id == request.auth.uid
         && incoming().id == registrationId
         && registrationId == request.auth.uid + '_' + incoming().event_id
+        && !('attendance_status' in incoming())
         && incoming().created_at == request.time
         && !exists(/databases/$(database)/documents/event_registrations/$(registrationId));
-      allow update, delete: if false;
+      allow update: if isAdmin()
+        && isValidId(registrationId)
+        && isValidEventRegistration(incoming())
+        && incoming().id == existing().id
+        && incoming().user_id == existing().user_id
+        && incoming().event_id == existing().event_id
+        && incoming().created_at == existing().created_at
+        && incoming().diff(existing()).affectedKeys().hasOnly(['attendance_status']);
+      allow delete: if isAdmin() && isValidId(registrationId);
     }
 
     match /clubs/{clubId} {
@@ -244,10 +356,11 @@ service cloud.firestore {
 
     match /club_memberships/{membershipId} {
       allow get: if isSignedIn() && isValidId(membershipId) && (
+        isAdmin() ||
         (resource == null && membershipId.matches('^' + request.auth.uid + '_.*')) ||
         (resource != null && existing().user_id == request.auth.uid)
       );
-      allow list: if isSignedIn() && existing().user_id == request.auth.uid;
+      allow list: if isSignedIn() && (existing().user_id == request.auth.uid || isAdmin());
       allow create: if isVerified()
         && isValidId(membershipId)
         && isValidClubMembership(incoming())
@@ -257,18 +370,33 @@ service cloud.firestore {
         && !exists(/databases/$(database)/documents/club_memberships/$(membershipId))
         && exists(/databases/$(database)/documents/clubs/$(incoming().club_id))
         && getAfter(/databases/$(database)/documents/clubs/$(incoming().club_id)).data.member_count == get(/databases/$(database)/documents/clubs/$(incoming().club_id)).data.member_count + 1;
-      allow update, delete: if false;
+      allow update: if false;
+      allow delete: if isAdmin() && isValidId(membershipId);
     }
 
     match /club_suggestions/{suggestionId} {
-      allow get: if isSignedIn() && isValidId(suggestionId) && (resource == null || existing().user_id == request.auth.uid);
-      allow list: if isSignedIn() && existing().user_id == request.auth.uid;
+      allow get: if isSignedIn() && isValidId(suggestionId) && (
+        isAdmin() ||
+        resource == null ||
+        existing().user_id == request.auth.uid
+      );
+      allow list: if isSignedIn() && (existing().user_id == request.auth.uid || isAdmin());
       allow create: if isVerified()
         && isValidId(suggestionId)
         && isValidClubSuggestion(incoming())
+        && incoming().user_id == request.auth.uid
+        && !('status' in incoming())
+        && !('admin_note' in incoming())
         && incoming().id == suggestionId
         && incoming().created_at == request.time;
-      allow update, delete: if false;
+      allow update: if isAdmin()
+        && isValidId(suggestionId)
+        && isValidClubSuggestion(incoming())
+        && incoming().id == existing().id
+        && incoming().user_id == existing().user_id
+        && incoming().created_at == existing().created_at
+        && incoming().diff(existing()).affectedKeys().hasOnly(['status', 'admin_note']);
+      allow delete: if isAdmin() && isValidId(suggestionId);
     }
   }
 }
