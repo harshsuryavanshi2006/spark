@@ -1,0 +1,254 @@
+{
+  "entities": {
+    "StudentDetails": {
+      "title": "StudentDetails",
+      "description": "Validated student details attached to an event registration.",
+      "type": "object",
+      "properties": {
+        "full_name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100
+        },
+        "division": {
+          "type": "string",
+          "enum": ["Comp", "IT", "Entc", "Other"]
+        },
+        "batch": {
+          "type": "string",
+          "enum": ["2024", "2025", "2026", "2027"]
+        },
+        "year": {
+          "type": "string",
+          "enum": ["1st Year", "2nd Year", "3rd Year", "4th Year"]
+        },
+        "date_of_birth": {
+          "type": "string",
+          "minLength": 10,
+          "maxLength": 10,
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+        },
+        "college": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 150
+        },
+        "phone": {
+          "type": "string",
+          "minLength": 7,
+          "maxLength": 20,
+          "pattern": "^\\+?[0-9 ()-]{7,20}$"
+        },
+        "terms": {
+          "type": "boolean"
+        }
+      },
+      "required": ["full_name", "division", "batch", "year", "date_of_birth", "college", "phone", "terms"]
+    },
+    "Profile": {
+      "title": "Profile",
+      "description": "Private student profile record owned by a single authenticated user.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "username": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100
+        },
+        "full_name": {
+          "type": "string",
+          "maxLength": 100
+        },
+        "department": {
+          "type": "string",
+          "maxLength": 100
+        },
+        "division": {
+          "type": "string",
+          "enum": ["", "Comp", "IT", "Entc", "Other"]
+        },
+        "batch": {
+          "type": "string",
+          "enum": ["", "2024", "2025", "2026", "2027"]
+        },
+        "year": {
+          "type": "string",
+          "enum": ["", "1st Year", "2nd Year", "3rd Year", "4th Year"]
+        },
+        "date_of_birth": {
+          "type": "string",
+          "maxLength": 10,
+          "pattern": "^(\\d{4}-\\d{2}-\\d{2})?$"
+        },
+        "college": {
+          "type": "string",
+          "maxLength": 150
+        },
+        "phone": {
+          "type": "string",
+          "maxLength": 20,
+          "pattern": "^(\\+?[0-9 ()-]{7,20})?$"
+        },
+        "avatar_url": {
+          "type": "string",
+          "maxLength": 100000
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updated_at": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["id", "username", "full_name", "department", "division", "batch", "year", "date_of_birth", "college", "phone", "avatar_url", "created_at", "updated_at"]
+    },
+    "EventRegistration": {
+      "title": "EventRegistration",
+      "description": "Student registration for a specific campus event.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "user_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "event_id": {
+          "type": "string",
+          "enum": [
+            "freshers-garba-session",
+            "open-mic-night",
+            "creative-challenge",
+            "football-tournament",
+            "tech-talk-series",
+            "dance-workshop"
+          ]
+        },
+        "student_details": {
+          "type": "object",
+          "$ref": "#/entities/StudentDetails"
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["id", "user_id", "event_id", "student_details", "created_at"]
+    },
+    "Club": {
+      "title": "Club",
+      "description": "Public campus club summary with transactionally updated member count.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "enum": ["dance", "web-design", "game-design", "robotics", "arts-design", "sports"]
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100
+        },
+        "member_count": {
+          "type": "integer"
+        }
+      },
+      "required": ["id", "name", "member_count"]
+    },
+    "ClubMembership": {
+      "title": "ClubMembership",
+      "description": "Unique student membership record for a campus club.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "user_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "club_id": {
+          "type": "string",
+          "enum": ["dance", "web-design", "game-design", "robotics", "arts-design", "sports"]
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["id", "user_id", "club_id", "created_at"]
+    },
+    "ClubSuggestion": {
+      "title": "ClubSuggestion",
+      "description": "Student-submitted suggestion for a new campus club.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "user_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "club_name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100
+        },
+        "category": {
+          "type": "string",
+          "enum": ["Technical", "Cultural", "Sports", "Workshop", "Social", "Other"]
+        },
+        "reason": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1000
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["id", "user_id", "club_name", "category", "reason", "created_at"]
+    }
+  },
+  "firestore": {
+    "/profiles/{userId}": {
+      "schema": { "$ref": "#/entities/Profile" },
+      "description": "Owner-only student profile documents keyed by Firebase Auth UID."
+    },
+    "/event_registrations/{registrationId}": {
+      "schema": { "$ref": "#/entities/EventRegistration" },
+      "description": "Owner-scoped event registration documents keyed by {userId}_{eventId}."
+    },
+    "/clubs/{clubId}": {
+      "schema": { "$ref": "#/entities/Club" },
+      "description": "Public campus club directory and live member counts."
+    },
+    "/club_memberships/{membershipId}": {
+      "schema": { "$ref": "#/entities/ClubMembership" },
+      "description": "Owner-scoped unique club memberships keyed by {userId}_{clubId}."
+    },
+    "/club_suggestions/{suggestionId}": {
+      "schema": { "$ref": "#/entities/ClubSuggestion" },
+      "description": "Owner-scoped new club suggestions submitted by signed-in students."
+    }
+  }
+}

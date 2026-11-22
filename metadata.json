@@ -1,0 +1,6 @@
+{
+  "name": "Spark — College Event Hub",
+  "description": "Discover campus events, clubs and opportunities.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
