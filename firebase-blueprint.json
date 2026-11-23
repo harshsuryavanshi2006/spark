@@ -113,6 +113,65 @@
         "updated_at"
       ]
     },
+    "Announcement": {
+      "title": "Announcement",
+      "description": "Date-wise admin announcement or notice displayed in the Student Digital Calendar and Admin Portal.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 140
+        },
+        "message": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1000
+        },
+        "category": {
+          "type": "string",
+          "enum": ["Announcement", "Event", "Community", "Reminder", "Urgent"]
+        },
+        "scheduled_date": {
+          "type": "string",
+          "minLength": 10,
+          "maxLength": 10,
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+        },
+        "scheduled_time": {
+          "type": "string",
+          "maxLength": 40
+        },
+        "author_name": {
+          "type": "string",
+          "maxLength": 100
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updated_at": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "title",
+        "message",
+        "category",
+        "scheduled_date",
+        "scheduled_time",
+        "author_name",
+        "created_at",
+        "updated_at"
+      ]
+    },
     "StudentDetails": {
       "title": "StudentDetails",
       "description": "Validated student details attached to an event registration.",
@@ -356,6 +415,10 @@
     "/events/{eventId}": {
       "schema": { "$ref": "#/entities/Event" },
       "description": "Public campus events catalog managed by admins and displayed to students."
+    },
+    "/announcements/{announcementId}": {
+      "schema": { "$ref": "#/entities/Announcement" },
+      "description": "Date-wise admin announcements and campus notices visible in the student digital calendar."
     },
     "/profiles/{userId}": {
       "schema": { "$ref": "#/entities/Profile" },

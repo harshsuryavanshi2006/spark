@@ -39,6 +39,8 @@ import { fieldClass } from '@/components/student-fields';
 import { EventThumbnail } from '@/components/event-thumbnail';
 import { InterestsSection } from '@/components/profile/interests-section';
 import { MyEventsSection } from '@/components/profile/my-events-section';
+import { DigitalCalendarSection } from '@/components/profile/digital-calendar-section';
+import { announcementsQuery } from '@/lib/announcements-data';
 import { clubCatalog } from '@/lib/club-data';
 import { defaultEventsCatalog, eventsQuery } from '@/lib/events-data';
 import {
@@ -191,6 +193,8 @@ function ProfilePage() {
   const { profile, registrations, memberships, suggestions, clubs } =
     useSuspenseQuery(studentQuery).data;
   const allEvents = useQuery(eventsQuery).data ?? defaultEventsCatalog;
+  const announcementsState = useQuery(announcementsQuery);
+  const announcements = announcementsState.data ?? [];
   const search = Route.useSearch();
   const activeTab: ProfileTab = search.tab ?? 'profile';
 
@@ -256,7 +260,15 @@ function ProfilePage() {
     created_at: idea.created_at,
   }));
 
-  const activity = [...eventActivity, ...clubActivity, ...suggestionActivity].sort(
+  const announcementActivity = announcements.map((ann) => ({
+    title: ann.title,
+    image: '',
+    sub: `${ann.category} · ${ann.scheduled_date}`,
+    status: ann.category,
+    created_at: ann.created_at,
+  }));
+
+  const activity = [...announcementActivity, ...eventActivity, ...clubActivity, ...suggestionActivity].sort(
     (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
   );
 
@@ -295,8 +307,43 @@ function ProfilePage() {
   const [avatarDraft, setAvatarDraft] = useState(profile.avatar_url);
   const [searchQuery, setSearchQuery] = useState('');
   const [showNotifications, setShowNotifications] = useState(false);
+  const [readNotificationIds, setReadNotificationIds] = useState<string[]>([]);
   const client = useQueryClient();
   const navigate = useNavigate();
+
+  const readStorageKey = `spark_read_notifications_${profile.id}`;
+
+  useEffect(() => {
+    try {
+      const saved = window.localStorage.getItem(readStorageKey);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) {
+          setReadNotificationIds(parsed.filter((item): item is string => typeof item === 'string'));
+        }
+      }
+    } catch {
+      // Ignore storage read errors in restricted iframe environments.
+    }
+  }, [readStorageKey]);
+
+  function persistReadIds(next: string[]) {
+    setReadNotificationIds(next);
+    try {
+      window.localStorage.setItem(readStorageKey, JSON.stringify(next));
+    } catch {
+      // Ignore storage write errors in restricted iframe environments.
+    }
+  }
+
+  function handleMarkRead(id: string) {
+    if (readNotificationIds.includes(id)) return;
+    persistReadIds([...readNotificationIds, id]);
+  }
+
+  function handleMarkAllRead(ids: string[]) {
+    persistReadIds([...new Set([...readNotificationIds, ...ids])]);
+  }
 
   function selectTab(tab: ProfileTab) {
     setShowNotifications(false);
@@ -506,6 +553,15 @@ function ProfilePage() {
             >
               My Events
             </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant={activeTab === 'calendar' ? 'default' : 'outline'}
+              onClick={() => selectTab('calendar')}
+              className="rounded-full"
+            >
+              Calendar
+            </Button>
             <Button asChild size="sm" variant="outline" className="rounded-full">
               <Link to="/registration" search={{ event: '' }}>
                 Register
@@ -538,61 +594,20 @@ function ProfilePage() {
               onCancelRegistration={handleCancelRegistration}
             />
           ) : activeTab === 'calendar' ? (
-            <div className="space-y-6">
-              <div className="space-y-2">
-                <button
-                  type="button"
-                  onClick={() => selectTab('profile')}
-                  className="inline-flex items-center gap-2 rounded-full border border-indigo-200/80 bg-[#f2effd] px-3.5 py-1.5 text-xs font-semibold text-secondary transition hover:bg-indigo-100"
-                >
-                  <ArrowLeft className="size-3.5" />
-                  Back to Profile
-                </button>
-                <h1 className="font-hand text-4xl text-secondary flex items-center gap-2">
-                  <Calendar className="size-7 text-indigo-600" />
-                  Digital Calendar
-                </h1>
-                <p className="text-sm text-muted-foreground">
-                  Dates and venues for your active event registrations.
-                </p>
-              </div>
-              {visibleUpcoming.length === 0 ? (
-                <div className="rounded-3xl border border-dashed border-indigo-200 bg-[#f8f7fe] px-6 py-10 text-center">
-                  <p className="text-sm font-medium text-secondary">No data submitted till now</p>
-                  <Button asChild size="sm" className="mt-4 rounded-full">
-                    <Link to="/events">
-                      Explore Events <ArrowRight className="size-3.5" />
-                    </Link>
-                  </Button>
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  {visibleUpcoming.map((ev) => (
-                    <div
-                      key={ev.id}
-                      className="rounded-2xl border border-indigo-100 bg-white p-4 flex flex-wrap items-center justify-between gap-3 shadow-xs"
-                    >
-                      <div className="min-w-0">
-                        <p className="font-semibold text-secondary">{ev.title}</p>
-                        <p className="text-xs text-muted-foreground mt-1 flex flex-wrap items-center gap-3">
-                          <span className="inline-flex items-center gap-1 tabular-nums">
-                            <Calendar className="size-3.5 text-indigo-500" />
-                            {ev.date} · {ev.time}
-                          </span>
-                          <span className="inline-flex items-center gap-1">
-                            <MapPin className="size-3.5 text-indigo-500" />
-                            {ev.place}
-                          </span>
-                        </p>
-                      </div>
-                      <Button asChild variant="outline" size="sm" className="rounded-full">
-                        <Link to="/events">View Event</Link>
-                      </Button>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
+            <DigitalCalendarSection
+              announcements={announcements}
+              announcementsLoading={announcementsState.isLoading}
+              events={allEvents}
+              registrations={registrations}
+              joinedClubs={joinedClubs}
+              suggestions={suggestions}
+              searchQuery={searchQuery}
+              readIds={readNotificationIds}
+              onMarkRead={handleMarkRead}
+              onMarkAllRead={handleMarkAllRead}
+              onBackToProfile={() => selectTab('profile')}
+              onSwitchTab={(tab) => selectTab(tab)}
+            />
           ) : activeTab === 'scores' ? (
             <div className="space-y-6">
               <div className="space-y-2">

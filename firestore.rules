@@ -112,6 +112,26 @@ service cloud.firestore {
         && data.updated_at is timestamp;
     }
 
+    function isValidAnnouncement(data) {
+      return data.keys().hasAll([
+          'id', 'title', 'message', 'category', 'scheduled_date',
+          'scheduled_time', 'author_name', 'created_at', 'updated_at'
+        ])
+        && data.keys().hasOnly([
+          'id', 'title', 'message', 'category', 'scheduled_date',
+          'scheduled_time', 'author_name', 'created_at', 'updated_at'
+        ])
+        && isValidId(data.id) && data.id.size() <= 64
+        && data.title is string && data.title.size() >= 1 && data.title.size() <= 140
+        && data.message is string && data.message.size() >= 1 && data.message.size() <= 1000
+        && data.category is string && data.category in ['Announcement', 'Event', 'Community', 'Reminder', 'Urgent']
+        && data.scheduled_date is string && data.scheduled_date.size() == 10 && data.scheduled_date.matches('^\\d{4}-\\d{2}-\\d{2}$')
+        && data.scheduled_time is string && data.scheduled_time.size() <= 40
+        && data.author_name is string && data.author_name.size() <= 100
+        && data.created_at is timestamp
+        && data.updated_at is timestamp;
+    }
+
     function isValidProfile(data) {
       return data.keys().hasAll([
           'id', 'username', 'full_name', 'department', 'division', 'batch', 'year',
@@ -282,6 +302,30 @@ service cloud.firestore {
           'tags', 'image', 'description', 'registration_open', 'updated_at'
         ]);
       allow delete: if isAdmin() && isValidId(eventId) && eventId.size() <= 64;
+    }
+
+    match /announcements/{announcementId} {
+      allow get: if isValidId(announcementId) && announcementId.size() <= 64;
+      allow list: if true;
+      allow create: if isAdmin()
+        && isValidId(announcementId)
+        && announcementId.size() <= 64
+        && isValidAnnouncement(incoming())
+        && incoming().id == announcementId
+        && incoming().created_at == request.time
+        && incoming().updated_at == request.time;
+      allow update: if isAdmin()
+        && isValidId(announcementId)
+        && announcementId.size() <= 64
+        && isValidAnnouncement(incoming())
+        && incoming().id == existing().id
+        && incoming().created_at == existing().created_at
+        && incoming().updated_at == request.time
+        && incoming().diff(existing()).affectedKeys().hasOnly([
+          'title', 'message', 'category', 'scheduled_date',
+          'scheduled_time', 'author_name', 'updated_at'
+        ]);
+      allow delete: if isAdmin() && isValidId(announcementId) && announcementId.size() <= 64;
     }
 
     match /profiles/{userId} {

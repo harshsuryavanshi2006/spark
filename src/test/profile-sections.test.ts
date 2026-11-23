@@ -1,4 +1,9 @@
 import { describe, expect, it } from 'vitest';
+import {
+  buildCalendarFeedItems,
+  buildMonthGrid,
+  parseFlexibleDateKey,
+} from '@/lib/calendar-helpers';
 import { classifyRegistration, computeCategorySummary } from '@/lib/profile-helpers';
 import type { CampusEvent } from '@/lib/events-data';
 
@@ -61,5 +66,52 @@ describe('profile sections helpers', () => {
         { ...baseEvent, status: 'upcoming' },
       ),
     ).toMatchObject({ bucket: 'cancelled', statusLabel: 'Cancelled' });
+  });
+
+  it('builds December 2026 calendar grid starting on Tuesday with 31 days', () => {
+    const grid = buildMonthGrid(2026, 11); // December 2026
+    expect(grid[0]).toEqual({ day: null, dateKey: null }); // Sun
+    expect(grid[1]).toEqual({ day: null, dateKey: null }); // Mon
+    expect(grid[2]).toEqual({ day: 1, dateKey: '2026-12-01' }); // Tue
+    const validDays = grid.filter((c) => c.day !== null);
+    expect(validDays).toHaveLength(31);
+    expect(validDays[30]).toEqual({ day: 31, dateKey: '2026-12-31' });
+  });
+
+  it('parses flexible dates and aggregates real admin announcements & events date-wise', () => {
+    expect(parseFlexibleDateKey('14 Dec 2026')).toBe('2026-12-14');
+    expect(parseFlexibleDateKey('2026-12-20')).toBe('2026-12-20');
+
+    const feed = buildCalendarFeedItems({
+      announcements: [
+        {
+          id: 'ann-1',
+          title: 'Holiday Notice',
+          message: 'Campus closed for maintenance.',
+          category: 'Announcement',
+          scheduled_date: '2026-12-14',
+          scheduled_time: '09:00 AM',
+          author_name: 'Admin',
+          created_at: '2026-12-01T08:00:00Z',
+          updated_at: '2026-12-01T08:00:00Z',
+        },
+      ],
+      events: [{ ...baseEvent, date: '20 Dec 2026' }],
+      registrations: [
+        { id: 'r1', event_id: baseEvent.id, attendance_status: 'registered', created_at: '2026-12-02T10:00:00Z' },
+      ],
+      joinedClubs: [],
+      suggestions: [],
+    });
+
+    expect(feed).toHaveLength(2);
+    expect(feed.find((i) => i.filterGroup === 'announcements')).toMatchObject({
+      dateKey: '2026-12-14',
+      title: 'Holiday Notice',
+    });
+    expect(feed.find((i) => i.filterGroup === 'events')).toMatchObject({
+      dateKey: '2026-12-20',
+      isRegisteredEvent: true,
+    });
   });
 });
