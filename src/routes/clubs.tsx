@@ -207,6 +207,7 @@ function ClubsPage() {
       } catch (insertError) {
         handleFirestoreError(insertError, OperationType.CREATE, `club_suggestions/${suggestionRef.id}`);
       }
+      await queryClient.invalidateQueries({ queryKey: ['student'] });
       setSuggestionMessage('Your suggestion has been sent. Thanks for sharing it!');
       form.reset();
     } catch (suggestionError) {

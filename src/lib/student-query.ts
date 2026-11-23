@@ -30,9 +30,13 @@ export type StudentProfile = {
   updated_at: string;
 };
 
+export type AttendanceStatus = 'registered' | 'attended' | 'absent' | 'cancelled';
+export type SuggestionStatus = 'pending' | 'approved' | 'declined';
+
 export type StudentRegistrationRecord = {
   id: string;
   event_id: string;
+  attendance_status: AttendanceStatus;
   created_at: string;
 };
 
@@ -42,12 +46,37 @@ export type StudentMembershipRecord = {
   created_at: string;
 };
 
+export type StudentSuggestionRecord = {
+  id: string;
+  club_name: string;
+  category: string;
+  reason: string;
+  status: SuggestionStatus;
+  admin_note: string;
+  created_at: string;
+};
+
 export type StudentDashboardData = {
   profile: StudentProfile;
   registrations: StudentRegistrationRecord[];
   memberships: StudentMembershipRecord[];
+  suggestions: StudentSuggestionRecord[];
   clubs: ClubCountRecord[];
 };
+
+function normalizeAttendanceStatus(val: unknown): AttendanceStatus {
+  if (val === 'attended' || val === 'absent' || val === 'cancelled' || val === 'registered') {
+    return val;
+  }
+  return 'registered';
+}
+
+function normalizeSuggestionStatus(val: unknown): SuggestionStatus {
+  if (val === 'approved' || val === 'declined' || val === 'pending') {
+    return val;
+  }
+  return 'pending';
+}
 
 function toIsoString(val: unknown): string {
   if (val && typeof val === 'object' && 'toDate' in val && typeof (val as { toDate: () => Date }).toDate === 'function') {
@@ -139,6 +168,7 @@ export async function fetchStudentDashboard(): Promise<StudentDashboardData> {
         return {
           id: docSnap.id,
           event_id: String(d['event_id'] ?? ''),
+          attendance_status: normalizeAttendanceStatus(d['attendance_status']),
           created_at: toIsoString(d['created_at']),
         };
       })
@@ -164,6 +194,27 @@ export async function fetchStudentDashboard(): Promise<StudentDashboardData> {
     handleFirestoreError(error, OperationType.LIST, 'club_memberships');
   }
 
+  let suggestions: StudentSuggestionRecord[] = [];
+  try {
+    const sugSnap = await getDocs(query(collection(db, 'club_suggestions'), where('user_id', '==', user.uid)));
+    suggestions = sugSnap.docs
+      .map((docSnap) => {
+        const d = docSnap.data();
+        return {
+          id: docSnap.id,
+          club_name: typeof d['club_name'] === 'string' ? d['club_name'] : '',
+          category: typeof d['category'] === 'string' ? d['category'] : 'Other',
+          reason: typeof d['reason'] === 'string' ? d['reason'] : '',
+          status: normalizeSuggestionStatus(d['status']),
+          admin_note: typeof d['admin_note'] === 'string' ? d['admin_note'] : '',
+          created_at: toIsoString(d['created_at']),
+        };
+      })
+      .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+  } catch (error) {
+    handleFirestoreError(error, OperationType.LIST, 'club_suggestions');
+  }
+
   let clubs: ClubCountRecord[] = [];
   try {
     const clubsSnap = await getDocs(collection(db, 'clubs'));
@@ -181,7 +232,7 @@ export async function fetchStudentDashboard(): Promise<StudentDashboardData> {
     handleFirestoreError(error, OperationType.LIST, 'clubs');
   }
 
-  return { profile, registrations, memberships, clubs };
+  return { profile, registrations, memberships, suggestions, clubs };
 }
 
 export async function saveStudentProfile(input: unknown) {
@@ -236,6 +287,22 @@ export async function registerStudentEvents(input: unknown) {
   }
 
   return { success: true, count: newEventIds.length };
+}
+
+export async function cancelStudentRegistration(registrationId: string) {
+  await auth.authStateReady();
+  const user = auth.currentUser;
+  if (!user) throw new Error('Please sign in to cancel your registration.');
+
+  const regPath = `event_registrations/${registrationId}`;
+  try {
+    await updateDoc(doc(db, 'event_registrations', registrationId), {
+      attendance_status: 'cancelled',
+    });
+    return { success: true };
+  } catch (error) {
+    handleFirestoreError(error, OperationType.UPDATE, regPath);
+  }
 }
 
 export const studentQuery = queryOptions({

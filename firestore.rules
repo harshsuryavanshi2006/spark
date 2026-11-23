@@ -180,7 +180,7 @@ service cloud.firestore {
         && isValidId(data.user_id)
         && isValidEventRef(data.event_id)
         && isValidStudentDetails(data.student_details)
-        && (!('attendance_status' in data) || (data.attendance_status is string && data.attendance_status in ['registered', 'attended', 'absent']))
+        && (!('attendance_status' in data) || (data.attendance_status is string && data.attendance_status in ['registered', 'attended', 'absent', 'cancelled']))
         && data.created_at is timestamp;
     }
 
@@ -323,14 +323,17 @@ service cloud.firestore {
         && !('attendance_status' in incoming())
         && incoming().created_at == request.time
         && !exists(/databases/$(database)/documents/event_registrations/$(registrationId));
-      allow update: if isAdmin()
-        && isValidId(registrationId)
+      allow update: if isValidId(registrationId)
         && isValidEventRegistration(incoming())
         && incoming().id == existing().id
         && incoming().user_id == existing().user_id
         && incoming().event_id == existing().event_id
         && incoming().created_at == existing().created_at
-        && incoming().diff(existing()).affectedKeys().hasOnly(['attendance_status']);
+        && incoming().diff(existing()).affectedKeys().hasOnly(['attendance_status'])
+        && (
+          isAdmin() ||
+          (isVerified() && existing().user_id == request.auth.uid && incoming().attendance_status == 'cancelled')
+        );
       allow delete: if isAdmin() && isValidId(registrationId);
     }
 

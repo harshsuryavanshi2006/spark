@@ -248,7 +248,7 @@
         },
         "attendance_status": {
           "type": "string",
-          "enum": ["registered", "attended", "absent"]
+          "enum": ["registered", "attended", "absent", "cancelled"]
         },
         "created_at": {
           "type": "string",
